@@ -72,7 +72,7 @@ if st.checkbox("Show Evaluation & Visualizations"):
 
 
     # Visualize score distributions
-    fig = evaluator.visualizeresults()
+    fig = evaluator.visualize_results()
     st.pyplot(fig)
 
     # Feature comparison plots
