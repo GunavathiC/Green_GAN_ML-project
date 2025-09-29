@@ -50,37 +50,67 @@ class CICIDSDataProcessor:
         """Load and preprocess CIC-IDS2017 dataset"""
         print("Loading CIC-IDS2017 dataset...")
         
-        # Load dataset (adjust column names based on your dataset)
+        # Load dataset first
         df = pd.read_csv(file_path)
         
-        # Remove unnecessary columns (adjust based on your dataset)
-        cols_to_drop = ['Flow ID', 'Source IP', 'Source Port', 'Destination IP', 
-                       'Destination Port', 'Timestamp']
-        df = df.drop([col for col in cols_to_drop if col in df.columns], axis=1)
+        # Keep IP columns separately for display
+        ip_cols = ['Source IP', 'Destination IP']
+        ip_data = df[ip_cols].copy()
         
-        # Handle missing values
+        # Drop unneeded columns but keep IP columns
+        
+        cols_to_drop = ['Flow ID', 'Source Port', 'Destination Port', 'Timestamp']
+# Note: 'Source IP' and 'Destination IP' removed from cols_to_drop to keep them
+
+        
+        # Separate features (exclude IP columns)
+        feature_cols = [col for col in df.columns if col not in ['Source IP', 'Destination IP', 'Label'] + cols_to_drop]
+        X = df[feature_cols]
+
+        
+        # Handle missing and infinite values
         df = df.dropna()
         df = df.replace([np.inf, -np.inf], np.nan).dropna()
         
-        # Separate features and labels
+        # Separate labels
         if 'Label' in df.columns:
-            X = df.drop('Label', axis=1)
             y = df['Label']
         else:
-            # If no Label column, assume last column is label
-            X = df.iloc[:, :-1]
             y = df.iloc[:, -1]
         
-        # Encode labels (BENIGN = 0, attacks = 1)
-        y_binary = (y != 'BENIGN').astype(int)
+        # Print unique raw labels before processing
+        print("Unique labels BEFORE processing:", y.unique())
+        
+        # Normalize label strings
+        y_processed = y.str.strip().str.title()
+        
+        # Map processed labels to known attack categories
+        attack_type_map = {
+            'Service Attack': 'Service Attack',
+            'Web Attack': 'Web Attack',
+            'Brute Force': 'Brute Force',
+            'Botnet': 'Botnet',
+            'Dos': 'DoS',
+            'Ddos': 'DDoS',
+            # Add more as needed
+        }
+        
+        y_mapped = y_processed.apply(lambda x: attack_type_map.get(x, 'Unknown'))
+        
+        # Print labels mapped as unknown for debugging
+        unknown_labels = y_processed[y_mapped == 'Unknown'].unique()
+        print("Labels mapped to Unknown:", unknown_labels)
         
         # Scale features
         X_scaled = self.scaler.fit_transform(X)
         
         print(f"Dataset loaded: {X_scaled.shape[0]} samples, {X_scaled.shape[1]} features")
-        print(f"Attack samples: {y_binary.sum()}, Benign samples: {len(y_binary) - y_binary.sum()}")
+        print(f"Attack samples: {(y_mapped != 'Benign').sum()}, Benign samples: {(y_mapped == 'Benign').sum()}")
         
-        return X_scaled, y_binary, X.columns.tolist()
+        return X_scaled, y_mapped, X.columns.tolist(), ip_data
+    
+
+
 
 # =============================================================================
 # 2. GREEN-GAN MODEL ARCHITECTURE
@@ -507,3 +537,5 @@ if __name__ == "__main__":
     print("\n✅ Green-GAN is ready for deployment in security testing!")
     print("💡 Use the generated synthetic attacks to test your security systems.")
     print("🌱 Energy-efficient training completed successfully!")
+    
+    
